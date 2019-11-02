@@ -81,9 +81,6 @@ while True:
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
         shape = sd.detect(c)
         
-        # all data
-        #print("F: {}, H: {}, W: {}".format(frame_number, center[0], center[1]))
-        
         # pattern data (height, width)
         pattern_data[frame_number].append((center[0], center[1]))
         
