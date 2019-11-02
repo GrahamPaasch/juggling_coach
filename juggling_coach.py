@@ -1,6 +1,4 @@
-# import the necessary packages
-# import centroidtracker
-from shapedetector import ShapeDetector
+from tools.shapedetector import ShapeDetector
 from collections import deque
 from imutils.video import VideoStream
 import numpy as np
