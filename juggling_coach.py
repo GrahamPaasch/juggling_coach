@@ -30,14 +30,12 @@ time.sleep(2.0)
 
 # initialize data collection
 frame_number = 0
-height_data = {}
-width_data = {}
+pattern_data = {}
 
 while True:
     
     frame_number += 1
-    height_data[frame_number] = []
-    width_data[frame_number] = []
+    pattern_data[frame_number] = []
     
     # grab the current frame
     frame = video_capture.read()
@@ -86,11 +84,8 @@ while True:
         # all data
         print("F: {}, H: {}, W: {}".format(frame_number, center[0], center[1]))
         
-        # height data
-        height_data[frame_number].append(center[0])
-    
-        # width data
-        width_data[frame_number].append(center[0])
+        # pattern data (height, width)
+        pattern_data[frame_number].append((center[0], center[1]))
         
         # multiply the contour (x, y)-coordinates by the resize ratio,
         # then draw the contours and the name of the shape on the image
@@ -118,7 +113,7 @@ cv2.destroyAllWindows()
 # plot the data and show the graph for height - ax^2+bx+c = 0
 fig = plt.figure()
 axes=fig.add_subplot(111)
-axes.plot(frame_data, height_data)
+axes.plot(list(pattern_data.keys()), pattern_data.values()[0])
 plt.title("All Balls - Height")
 plt.show()
 
