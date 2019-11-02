@@ -82,7 +82,7 @@ while True:
         shape = sd.detect(c)
         
         # all data
-        print("F: {}, H: {}, W: {}".format(frame_number, center[0], center[1]))
+        #print("F: {}, H: {}, W: {}".format(frame_number, center[0], center[1]))
         
         # pattern data (height, width)
         pattern_data[frame_number].append((center[0], center[1]))
@@ -93,6 +93,9 @@ while True:
         c = c.astype("int")
         cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
         cv2.circle(frame, center, 5, (0, 0, 255), -1)
+    else:
+        if len(pattern_data[frame_number]) == 5:
+            print("Frame {}: {}".format(frame_number, pattern_data[frame_number]))
     
     # show the frame to our screen
     cv2.imshow("Frame", frame)
