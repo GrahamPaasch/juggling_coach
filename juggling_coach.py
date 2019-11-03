@@ -129,19 +129,26 @@ cv2.destroyAllWindows()
 print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
 
 for ball in range(number_of_balls):
-    # initialize the graph that will show the data
-    fig = plt.figure()
-    axes = fig.add_subplot(111)
-    
-    # gather the height data for one ball
+# gather the height and width data for one ball
     height = []
+    width = []
     for frame in pattern_data:
         if ball == number_of_balls:
             ball = 0
         height.append(pattern_data[frame][ball][0])
+        width.append(pattern_data[frame][ball][1])
         ball += 1
     
-    # plot the data
+    # plot the height data
+    fig = plt.figure()
+    axes = fig.add_subplot(111)
     axes.plot(list(pattern_data.keys()), height)
     plt.title("Ball {} - Height".format(str(ball)))
+    plt.show()
+    
+    # plot the width data
+    fig = plt.figure()
+    axes = fig.add_subplot(111)
+    axes.plot(list(pattern_data.keys()), width)
+    plt.title("Ball {} - Width".format(str(ball)))
     plt.show()
