@@ -7,6 +7,8 @@ import imutils
 import time
 import matplotlib.pyplot as plt
 
+number_of_balls = 5
+
 ap = argparse.ArgumentParser()
 
 ap.add_argument(
@@ -40,13 +42,15 @@ pattern_data = {}
 while True:
     
     frame_number += 1
-    pattern_data[frame_number] = []
     frame_data = video_capture.read()
     not_resized = frame_data[1]
     
     # if there is not data for a frame, then the video has ended
     if not_resized is None:
         break
+    
+    # initialize data collection for the frame
+    pattern_data[frame_number] = []
     
     # resize the frame, blur it, and convert it to the HSV
     # color space
@@ -97,8 +101,11 @@ while True:
         # adjust the number below for the number of balls you're tracking
         # sometimes not all of the balls in a frame are detected due to
         # the color threshold values and the black white portions of the mask
-        if len(pattern_data[frame_number]) == 5:
+        if len(pattern_data[frame_number]) == number_of_balls:
             print("Frame {}: {}".format(frame_number, pattern_data[frame_number]))
+        else:
+            # toss out any frame where not all the balls were detected
+            del pattern_data[frame_number]
     
     # comment the next line if you want the data without showing the video
     cv2.imshow("Frame", frame)
@@ -118,9 +125,9 @@ video_capture.release()
 cv2.destroyAllWindows()
 
 '''
-# plot the data and show the graph for height - parabola equation: ax^2+bx+c = 0
+# plot the data and show the graphs
 fig = plt.figure()
-axes=fig.add_subplot(111)
+axes = fig.add_subplot(111)
 axes.plot(list(pattern_data.keys()), pattern_data.values()[0])
 plt.title("All Balls - Height")
 plt.show()
