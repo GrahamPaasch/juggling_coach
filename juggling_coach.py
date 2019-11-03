@@ -125,23 +125,23 @@ video_capture.release()
 # close all windows
 cv2.destroyAllWindows()
 
-# initialize the graphs that will show the data
-fig = plt.figure()
-axes = fig.add_subplot(111)
-
-# get the height data
-height = []
-ball_position = 0
-for frame in pattern_data:
-    if ball_position == 5:
-        ball_position = 0
-    height.append(pattern_data[frame][ball_position][0])
-    ball_position += 1
-
-# plot the data for height
-axes.plot(list(pattern_data.keys()), height)
-plt.title("One Ball - Height")
-plt.show()
+for ball in range(number_of_balls):
+    # initialize the graph that will show the data
+    fig = plt.figure()
+    axes = fig.add_subplot(111)
+    
+    # gather the height data for one ball
+    height = []
+    for frame in pattern_data:
+        if ball == number_of_balls:
+            ball = 0
+        height.append(pattern_data[frame][ball][0])
+        ball += 1
+    
+    # plot the data
+    axes.plot(list(pattern_data.keys()), height)
+    plt.title("Ball {} - Height".format(str(ball)))
+    plt.show()
 
 # print tracking time
 print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
