@@ -124,55 +124,19 @@ video_capture.release()
 # close all windows
 cv2.destroyAllWindows()
 
-'''
-# plot the data and show the graphs
+# initialize the graphs that will show the data
 fig = plt.figure()
 axes = fig.add_subplot(111)
-axes.plot(list(pattern_data.keys()), pattern_data.values()[0])
-plt.title("All Balls - Height")
-plt.show()
 
-# Get data for one ball
-new_x = []
-new_y = []
-for num, data in enumerate(graph_data_height):
-    try:
-        if data[0] != graph_data_height[num+1][0]:
-            new_x.append(data[0])
-            new_y.append(data[1])
-    except IndexError:
-        break
+# get the height data
+height = []
+for frame in pattern_data:
+    height.append(pattern_data[frame][0][0])
 
-fig = plt.figure()
-axes=fig.add_subplot(111)
-axes.plot(new_x, new_y)
+# plot the data for height
+axes.plot(list(pattern_data.keys()), height)
 plt.title("One Ball - Height")
 plt.show()
 
-# plot the data and show the graph for width - ax^2+bx+c = 0
-fig = plt.figure()
-axes=fig.add_subplot(111)
-axes.plot(frame_data, width_data)
-plt.title("All Balls - Width")
-plt.show()
-
-# Get data for one ball
-new_x = []
-new_y = []
-for num, data in enumerate(graph_data_width):
-    try:
-        if data[0] != graph_data_width[num+1][0]:
-            new_x.append(data[0])
-            new_y.append(data[1])
-    except IndexError:
-        break
-
-fig = plt.figure()
-axes=fig.add_subplot(111)
-axes.plot(new_x, new_y)
-plt.title("One Ball - Width")
-plt.show()
-
 # print tracking time
-print("Tracked for {} seconds!".format(len(frame_data)/30))
-'''
+print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
