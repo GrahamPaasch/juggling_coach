@@ -125,6 +125,9 @@ video_capture.release()
 # close all windows
 cv2.destroyAllWindows()
 
+# print tracking time
+print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
+
 for ball in range(number_of_balls):
     # initialize the graph that will show the data
     fig = plt.figure()
@@ -142,6 +145,3 @@ for ball in range(number_of_balls):
     axes.plot(list(pattern_data.keys()), height)
     plt.title("Ball {} - Height".format(str(ball)))
     plt.show()
-
-# print tracking time
-print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
