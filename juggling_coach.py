@@ -15,14 +15,6 @@ ap.add_argument(
     help="path to the video file"
 )
 
-ap.add_argument(
-    "-b",
-    "--buffer",
-    type=int,
-    default=64,
-    help="max buffer size"
-)
-
 args = vars(ap.parse_args())
 
 # Adjust these values based on the color of the object
