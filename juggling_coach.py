@@ -41,10 +41,10 @@ while True:
     
     frame_number += 1
     pattern_data[frame_number] = []
-    frame = video_capture.read()
-    not_resized = frame[1]
+    frame_data = video_capture.read()
+    not_resized = frame_data[1]
     
-    # if there is not a next frame, then the video has ended
+    # if there is not data for a frame, then the video has ended
     if not_resized is None:
         break
     
