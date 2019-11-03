@@ -102,6 +102,7 @@ while True:
         # sometimes not all of the balls in a frame are detected due to
         # the color threshold values and the black white portions of the mask
         if len(pattern_data[frame_number]) == number_of_balls:
+            pattern_data[frame_number].sort()
             print("Frame {}: {}".format(frame_number, pattern_data[frame_number]))
         else:
             # toss out any frame where not all the balls were detected
@@ -130,8 +131,12 @@ axes = fig.add_subplot(111)
 
 # get the height data
 height = []
+ball_position = 0
 for frame in pattern_data:
-    height.append(pattern_data[frame][0][0])
+    if ball_position == 5:
+        ball_position = 0
+    height.append(pattern_data[frame][ball_position][0])
+    ball_position += 1
 
 # plot the data for height
 axes.plot(list(pattern_data.keys()), height)
