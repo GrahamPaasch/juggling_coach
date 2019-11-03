@@ -1,4 +1,3 @@
-from tools.shapedetector import ShapeDetector
 from collections import deque
 from imutils.video import VideoStream
 import numpy as np
@@ -8,24 +7,38 @@ import imutils
 import time
 import matplotlib.pyplot as plt
 
-# construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video",
-    help="path to the video file")
-ap.add_argument("-b", "--buffer", type=int, default=64,
-    help="max buffer size")
+
+ap.add_argument(
+    "-v",
+    "--video",
+    help="path to the video file"
+)
+
+ap.add_argument(
+    "-b",
+    "--buffer",
+    type=int,
+    default=64,
+    help="max buffer size"
+)
+
 args = vars(ap.parse_args())
 
-# define the lower and upper boundaries
-# ball in the HSV color space, then initialize the
-# list of tracked points
+# Adjust these values based on the color of the object
+# you want to track. You will create a black and white "mask",
+# where the white parts are going to be what you want to track.
+# later you will use the findContours method of cv2 to detect
+# the black and white edges in the mask. Once you have this,
+# you can find the perimeter of every white shape in the mask, 
+# and find the center most point in the shape, the centroid.
 colorLower = (0, 0, 245)
 colorUpper = (255, 255, 255)
-pts = deque(maxlen=args["buffer"])
 
+# feed the video into cv2
 video_capture = cv2.VideoCapture(args["video"])
 
-# allow the camera or video file to warm up
+# video file to warm up / load in
 time.sleep(2.0)
 
 # initialize data collection
@@ -36,15 +49,10 @@ while True:
     
     frame_number += 1
     pattern_data[frame_number] = []
-    
-    # grab the current frame
     frame = video_capture.read()
-    
-    # use only the data from the tuple, not the meta info
     not_resized = frame[1]
     
-    # if we are viewing a video and we did not grab a frame,
-    # then we have reached the end of the video
+    # if there is not a next frame, then the video has ended
     if not_resized is None:
         break
     
@@ -55,51 +63,59 @@ while True:
     blurred = cv2.GaussianBlur(frame, (11, 11), 0)
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
     
-    # construct a mask, then perform
+    # construct the black and white mask, then perform
     # a series of dilations and erosions to remove any small
     # blobs left in the mask
     mask = cv2.inRange(hsv, colorLower, colorUpper)
     mask = cv2.erode(mask, None, iterations=2)
     mask = cv2.dilate(mask, None, iterations=2)
     
-    # find contours in the mask and initialize the current
-    # (x, y) center of the ball
-    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
+    # uncomment the next line to see the black and white mask
+    #cv2.imshow("mask", mask)
+    
+    # find the white shapes in the mask
+    edges = cv2.findContours(
+        mask.copy(),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+    white_shapes = imutils.grab_contours(edges)
     center = None
     
-    # Shape detection of the white parts of the black mask
-    # using the coordinates of the changes from white to black
-    sd = ShapeDetector()
-    for c in cnts:
-        # compute the center of the contour, then detect the name of the
-        # shape using only the contour
-        M = cv2.moments(c)
-        cX = int((M["m10"] / M["m00"]))
-        cY = int((M["m01"] / M["m00"]))
+    # based on the data of the coordinates of the edges (aka
+    # changes from white to black) in the mask, find the center
+    # most part of each the white shape found in the mask
+    for white_shape in white_shapes:
+        M = cv2.moments(white_shape)
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-        shape = sd.detect(c)
         
-        # pattern data (height, width)
+        # collect the pattern data found in each frame (height, width)
         pattern_data[frame_number].append((center[0], center[1]))
         
         # multiply the contour (x, y)-coordinates by the resize ratio,
-        # then draw the contours and the name of the shape on the image
-        c = c.astype("float")
-        c = c.astype("int")
-        cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
+        # then draw the edges of the white shapes found in the mask
+        # onto the regular non-mask video frame. Also draw a red dot
+        # to represent each centroid found.
+        white_shape = white_shape.astype("float")
+        white_shape = white_shape.astype("int")
+        cv2.drawContours(frame, [white_shape], -1, (0, 255, 0), 2)
         cv2.circle(frame, center, 5, (0, 0, 255), -1)
+    
     else:
+        # adjust the number below for the number of balls you're tracking
+        # sometimes not all of the balls in a frame are detected due to
+        # the color threshold values and the black white portions of the mask
         if len(pattern_data[frame_number]) == 5:
             print("Frame {}: {}".format(frame_number, pattern_data[frame_number]))
     
-    # show the frame to our screen
+    # comment the next line if you want the data without showing the video
     cv2.imshow("Frame", frame)
-    #time.sleep(0.1)
-    key = cv2.waitKey(1) & 0xFF
     
-    # if the 'q' key is pressed, stop the loop
+    # uncomment the next line if you want the video in slow motion
+    #time.sleep(0.1)
+    
+    # if the 'q' key is pressed, stop the video
+    key = cv2.waitKey(1) & 0xFF
     if key == ord("q"):
         break
 
@@ -110,7 +126,7 @@ video_capture.release()
 cv2.destroyAllWindows()
 
 '''
-# plot the data and show the graph for height - ax^2+bx+c = 0
+# plot the data and show the graph for height - parabola equation: ax^2+bx+c = 0
 fig = plt.figure()
 axes=fig.add_subplot(111)
 axes.plot(list(pattern_data.keys()), pattern_data.values()[0])
