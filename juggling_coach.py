@@ -30,7 +30,7 @@ colorUpper = (255, 255, 255)
 # feed the video into cv2
 video_capture = cv2.VideoCapture(args["video"])
 
-# video file to warm up / load in
+# wait for video file to warm up / load in
 time.sleep(2.0)
 
 # initialize data collection
@@ -72,17 +72,17 @@ while True:
         cv2.CHAIN_APPROX_SIMPLE
     )
     white_shapes = imutils.grab_contours(edges)
-    center = None
     
     # based on the data of the coordinates of the edges (aka
     # changes from white to black) in the mask, find the center
     # most part of each the white shape found in the mask
+    centroid = None
     for white_shape in white_shapes:
         M = cv2.moments(white_shape)
-        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+        centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
         
         # collect the pattern data found in each frame (height, width)
-        pattern_data[frame_number].append((center[0], center[1]))
+        pattern_data[frame_number].append((centroid[0], centroid[1]))
         
         # multiply the contour (x, y)-coordinates by the resize ratio,
         # then draw the edges of the white shapes found in the mask
@@ -91,7 +91,7 @@ while True:
         white_shape = white_shape.astype("float")
         white_shape = white_shape.astype("int")
         cv2.drawContours(frame, [white_shape], -1, (0, 255, 0), 2)
-        cv2.circle(frame, center, 5, (0, 0, 255), -1)
+        cv2.circle(frame, centroid, 5, (0, 0, 255), -1)
     
     else:
         # adjust the number below for the number of balls you're tracking
