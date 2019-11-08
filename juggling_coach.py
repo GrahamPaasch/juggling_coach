@@ -144,11 +144,11 @@ for ball in range(number_of_balls):
     axes = fig.add_subplot(111)
     axes.plot(list(pattern_data.keys()), height)
     plt.title("Ball {} - Height".format(str(ball)))
-    plt.show()
     
     # plot the width data
     fig = plt.figure()
     axes = fig.add_subplot(111)
     axes.plot(list(pattern_data.keys()), width)
     plt.title("Ball {} - Width".format(str(ball)))
-    plt.show()
+
+plt.show()
