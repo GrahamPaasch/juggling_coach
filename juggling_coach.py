@@ -162,7 +162,7 @@ throws = []
 directions = []
 catches = 0
 for key in keys:
-    throws.append(data[key][0][0])
+    throws.append(pattern_data[key][0][0])
     try:
         if throws[-1] < throws[-2]:
             directions.append("down")
