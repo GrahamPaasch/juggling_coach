@@ -157,7 +157,7 @@ plt.show()
 # detected ball - does not count the ending collect - because
 # the ball is not thrown back up so there is no down/up motion
 # TODO: Somehow track the collect so that catch counts are accurate
-keys = data.keys()
+keys = pattern_data.keys()
 throws = []
 directions = []
 catches = 0
