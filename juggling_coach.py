@@ -152,3 +152,32 @@ for ball in range(number_of_balls):
     plt.title("Ball {} - Width".format(str(ball)))
 
 plt.show()
+
+# catch counter - tracks changes in up/down for the lowest
+# detected ball - does not count the ending collect - because
+# the ball is not thrown back up so there is no down/up motion
+# TODO: Somehow track the collect so that catch counts are accurate
+keys = data.keys()
+throws = []
+directions = []
+catches = 0
+for key in keys:
+    throws.append(data[key][0][0])
+    try:
+        if throws[-1] < throws[-2]:
+            directions.append("down")
+        elif throws[-1] > throws[-2]:
+            directions.append("up")
+        else:
+            directions.append(throws[-2])
+        if directions[-1] == "down" and directions[-2] == "up":
+            catches += 1
+            print("Ball 1 catch count: {}".format(catches))
+    except IndexError:
+        continue
+else:
+    print(
+        "Total catches: {}".format(
+            catches
+        )
+    )
