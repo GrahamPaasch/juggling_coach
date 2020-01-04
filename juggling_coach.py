@@ -6,6 +6,7 @@ import cv2
 import imutils
 import time
 import matplotlib.pyplot as plt
+import centroidtracker
 
 number_of_balls = 5
 
@@ -39,6 +40,9 @@ time.sleep(2.0)
 frame_number = 0
 pattern_data = {}
 
+# initialize centroid tracker
+ct = centroidtracker.CentroidTracker()
+    
 while True:
     
     frame_number += 1
@@ -84,6 +88,7 @@ while True:
     for white_shape in white_shapes:
         M = cv2.moments(white_shape)
         centroid = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+        ct.register(centroid)
         
         # collect the pattern data found in each frame (height, width)
         pattern_data[frame_number].append((centroid[0], centroid[1]))
@@ -91,7 +96,7 @@ while True:
         # multiply the contour (x, y)-coordinates by the resize ratio,
         # then draw the edges of the white shapes found in the mask
         # onto the regular non-mask video frame. Also draw a red dot
-        # to represent each centroid found.
+        # to represent each centroid found. 
         white_shape = white_shape.astype("float")
         white_shape = white_shape.astype("int")
         cv2.drawContours(frame, [white_shape], -1, (0, 255, 0), 2)
@@ -109,7 +114,7 @@ while True:
             del pattern_data[frame_number]
     
     # comment the next line if you want the data without showing the video
-    cv2.imshow("Frame", frame)
+    #cv2.imshow("Frame", frame)
     
     # uncomment the next line if you want the video in slow motion
     #time.sleep(0.1)
@@ -128,51 +133,48 @@ cv2.destroyAllWindows()
 # print tracking time
 print("Tracked for {} seconds!".format(list(pattern_data.keys())[-1]/30))
 
-for ball in range(number_of_balls):
-# gather the height and width data for one ball
-    height = []
-    width = []
-    for frame in pattern_data:
-        if ball == number_of_balls:
-            ball = 0
-        height.append(pattern_data[frame][ball][0])
-        width.append(pattern_data[frame][ball][1])
-        ball += 1
-    
-    # plot the height data
-    fig = plt.figure()
-    axes = fig.add_subplot(111)
-    axes.plot(list(pattern_data.keys()), height)
-    plt.title("Ball {} - Height".format(str(ball)))
-    
-    # plot the width data
-    fig = plt.figure()
-    axes = fig.add_subplot(111)
-    axes.plot(list(pattern_data.keys()), width)
-    plt.title("Ball {} - Width".format(str(ball)))
+def graph(data):
+     for i in data:
+             plt.plot(-i[0], -i[1], 'd')
 
+for i in pattern_data:
+	graph(pattern_data[i])
+
+# Comment or uncomment to show graph
 plt.show()
 
 # catch counter - tracks changes in up/down for the lowest
 # detected ball - does not count the ending collect - because
 # the ball is not thrown back up so there is no down/up motion
+# demo video has 43 catches
 # TODO: Somehow track the collect so that catch counts are accurate
 keys = pattern_data.keys()
 throws = []
 directions = []
 catches = 0
+a = 0
+b = 4
 for key in keys:
-    throws.append(pattern_data[key][0][0])
+    if a < 5 and b > 0:
+        throws.append(pattern_data[key][a][0])
+        a += 1
+    elif b > 0:
+        throws.append(pattern_data[key][b][0])
+        b -= 1
+    else:
+        a = 0
+        b = 4
+        throws.append(pattern_data[key][a][0])
+        a += 1
     try:
         if throws[-1] < throws[-2]:
             directions.append("down")
+            print("Tracked at: {} | Went DOWN by: {}".format(throws[-1], throws[-1] - throws[-2]))
         elif throws[-1] > throws[-2]:
             directions.append("up")
-        else:
-            directions.append(throws[-2])
+            print("Tracked at: {} | Went UP by: {}".format(throws[-1], throws[-1] - throws[-2]))
         if directions[-1] == "down" and directions[-2] == "up":
             catches += 1
-            print("Ball 1 catch count: {}".format(catches))
     except IndexError:
         continue
 else:
