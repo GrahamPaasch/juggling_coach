@@ -1,0 +1,6 @@
+tracking:
+  min_ball_radius: 10
+  max_ball_radius: 30
+  color_lower: [30, 50, 50]  # HSV values for ball color detection
+  color_upper: [80, 255, 255]
+  max_disappeared: 30  # Maximum frames a ball can disappear before being forgotten

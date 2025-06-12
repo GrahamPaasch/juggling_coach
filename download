@@ -1,0 +1,57 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+<title>Ubuntu – Error</title>
+<link rev="made" href="mailto:rhonda@ubuntu.com">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="Author" content="Rhonda D'Vine, rhonda@ubuntu.com">
+<meta name="Description" content="">
+<meta name="Keywords" content="Ubuntu,  ">
+
+
+<link href="/ubuntu/ubuntu-new.css" rel="stylesheet" type="text/css" media="all">
+
+<script src="/packages.js" type="text/javascript"></script>
+</head>
+<body>    <div id="wrapper">
+      <div id="header">
+        <a class="imageLink"
+             href="/"><img src="/ubuntu/logo-ubuntu-header.png" width="118" height="27" alt="Ubuntu Logo" /> packages</a>
+
+        <a class="hiddenStructure"
+             href="//#documentContent">Skip
+             to content</a>
+
+
+   </div>  <!-- header -->
+
+<div id="pnavbar">
+ » <a href="http://www.ubuntu.com/" title="Ubuntu Homepage">Ubuntu</a>
+ » <a href="/" title="Ubuntu Packages Homepage">Packages</a>
+
+</div> <!-- end navbar -->
+
+<div id="content">
+
+  <h1>Error</h1><!-- messages.tmpl --><div class="perror">
+ <p>two or more packages specified (gzip disco)</p>
+</div></div> <!-- content -->
+</div> <!-- wrapper -->
+
+<div id="footer">
+
+
+
+<div id="fineprint" class="bordertop">
+<div id="impressum">
+
+<p>
+Content Copyright &copy; 2023 <a href="http://www.canonical.com/">Canonical Ltd.</a>; See <a href="http://www.ubuntu.com/legal">license terms</a>. Ubuntu is a <a href="http://www.ubuntu.com/aboutus/trademarkpolicy">trademark</a> of Canonical Ltd.
+ <a href="/about/">Learn more about this site</a>.</p>
+
+<p><a href="https://bugs.launchpad.net/pkg-website/+filebug">Report a bug on this site</a>.</p>
+</div> <!-- end impressum -->
+
+</div> <!-- end footer -->
+</body>
+</html>
