@@ -61,6 +61,7 @@ class PatternVisualizer:
             '3d_grid': (128, 128, 128),
             '3d_trajectory': (0, 255, 128)
         })
+        self.drill_viz = DrillVisualization()
         self.heatmap = None
         self.stats_history = []
         self.perspective_matrix = None
@@ -69,7 +70,6 @@ class PatternVisualizer:
         self.view_3d_region = (0, 0, 0, 0)  # x, y, width, height
         self.ideal_trajectory_cache = {}
         self.error_threshold = 20  # pixels
-        self.drill_viz = DrillVisualization()
         self.drill_colors = {
             'progress_bar': (0, 255, 0),
             'instruction': (255, 255, 255),
@@ -252,7 +252,7 @@ class PatternVisualizer:
                    0.5, self.colors['text'], 1)
     
     def handle_mouse_event(self, event: int, x: int, y: int, flags: int) -> None:
-        """Handle mouse interactions for 3D view control."""
+        """Handle mouse events for 3D visualization."""
         # Check if mouse is in 3D view region
         vx, vy, vw, vh = self.view_3d_region
         if not (vx <= x <= vx + vw and vy <= y <= vy + vh):
@@ -618,7 +618,7 @@ class PatternVisualizer:
         return frame
 
     def draw_statistics_overlay(self, frame: np.ndarray, metrics: AdvancedMetrics) -> np.ndarray:
-        """Draw interactive statistics visualization overlay."""
+        """Draw statistics visualization overlay."""
         height, width = frame.shape[:2]
         
         # Update statistics
@@ -695,7 +695,7 @@ class PatternVisualizer:
         return frame
 
     def handle_graph_interaction(self, event: int, x: int, y: int, flags: int) -> None:
-        """Handle mouse interactions for graph controls."""
+        """Handle mouse events for graph interaction."""
         # Check if mouse is in graph region
         gx, gy, gw, gh = self.graph_interaction_region
         if not (gx <= x <= gx + gw and gy <= y <= gy + gh):

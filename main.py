@@ -1,4 +1,5 @@
 import cv2
+import time
 from pathlib import Path
 from src.utils.config import Config
 from src.tracking.detector import BallDetector
@@ -11,7 +12,7 @@ from src.visualization.graph_panel import GraphPanel  # Import GraphPanel
 
 def main():
     # Load configuration
-    config_path = Path('config/settings.yaml')
+    config_path = str(Path('config/settings.yaml'))  # Convert Path to str
     config = Config.load(config_path)
     
     # Initialize components
@@ -19,14 +20,27 @@ def main():
     tracker = CentroidTracker(max_disappeared=config.tracking.max_disappeared)
     visualizer = PatternVisualizer()
     graph_panel = GraphPanel(width=320, height=720)
+    pattern_recognizer = PatternRecognizer()
+    analyzer = PatternAnalyzer()
+    
+    # Add drill generator initialization
+    drill_generator = DrillGenerator(DrillConfig(
+        duration_seconds=30,
+        improvement_threshold=0.2
+    ))
+    
+    current_frame = None  # Add frame reference at function scope
     
     # Set up mouse callback
     def mouse_callback(event, x, y, flags, param):
+        if current_frame is None:
+            return
+            
         visualizer.handle_mouse_event(event, x, y, flags)  # For 3D view
         visualizer.handle_graph_interaction(event, x, y, flags)  # For graphs
-        if x > frame.shape[1] - graph_panel.width:
+        if x > current_frame.shape[1] - graph_panel.width:
             # Adjust x coordinate relative to graph panel
-            graph_panel.handle_mouse(event, x - (frame.shape[1] - graph_panel.width), y, flags)
+            graph_panel.handle_mouse(event, x - (current_frame.shape[1] - graph_panel.width), y, flags)
     
     cv2.namedWindow('Juggling Coach')
     cv2.setMouseCallback('Juggling Coach', mouse_callback)
@@ -40,7 +54,8 @@ def main():
         ret, frame = cap.read()
         if not ret:
             break
-            
+        
+        current_frame = frame  # Update current frame reference
         # Detect and track balls
         ball_positions = detector.detect(frame)
         tracked_objects = tracker.update(ball_positions)
