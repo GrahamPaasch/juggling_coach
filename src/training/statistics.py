@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import sqlite3
 from typing import List, Dict, Optional
@@ -96,3 +96,46 @@ class StatisticsManager:
             return None
         values = list(history.values())
         return (values[-1] - values[0]) / values[0]
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional
+import numpy as np
+from datetime import datetime
+
+@dataclass
+class MetricHistory:
+    values: List[float] = field(default_factory=list)
+    timestamps: List[datetime] = field(default_factory=list)
+    max_points: int = 1000
+
+    def add_value(self, value: float) -> None:
+        try:
+            if not isinstance(value, (int, float)):
+                raise ValueError("Invalid metric value type")
+                
+            self.values.append(float(value))
+            self.timestamps.append(datetime.now())
+            
+            # Maintain fixed buffer size
+            if len(self.values) > self.max_points:
+                self.values = self.values[-self.max_points:]
+                self.timestamps = self.timestamps[-self.max_points:]
+                
+        except Exception as e:
+            print(f"Error adding metric value: {e}")
+
+class StatsTracker:
+    def __init__(self):
+        self.metrics: Dict[str, MetricHistory] = {
+            'height_consistency': MetricHistory([], []),
+            'horizontal_drift': MetricHistory([], []),
+            'beat_timing': MetricHistory([], []),
+            'dwell_ratio': MetricHistory([], []),
+            'pattern_symmetry': MetricHistory([], [])
+        }
+    
+    def update_metrics(self, metrics_dict: Dict[str, float]):
+        """Update all metrics with new values."""
+        for metric_name, value in metrics_dict.items():
+            if metric_name in self.metrics:
+                self.metrics[metric_name].add_value(value)

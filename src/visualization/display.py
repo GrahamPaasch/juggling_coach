@@ -7,6 +7,7 @@ from ..tracking.tracker import TrackedObject
 from ..analysis.pattern_recognition import PatternInfo
 from ..training.drill_generator import DrillExercise
 from ..analysis.metrics import AdvancedMetrics
+from ..training.statistics import StatsTracker
 
 @dataclass
 class View3DState:
@@ -24,6 +25,26 @@ class DrillVisualization:
     progress: float = 0.0
     success_count: int = 0
     attempt_count: int = 0
+
+@dataclass
+class GraphState:
+    visible_metrics: Dict[str, bool] = None
+    time_window: int = 100  # Number of frames to show
+    selected_metric: Optional[str] = None
+    is_dragging: bool = False
+    last_mouse_pos: Tuple[int, int] = (0, 0)
+    zoom_level: float = 1.0
+    pan_offset: int = 0
+
+    def __post_init__(self):
+        if self.visible_metrics is None:
+            self.visible_metrics = {
+                'height_consistency': True,
+                'horizontal_drift': True,
+                'beat_timing': True,
+                'dwell_ratio': True,
+                'pattern_symmetry': True
+            }
 
 class PatternVisualizer:
     def __init__(self):
@@ -72,6 +93,9 @@ class PatternVisualizer:
             'pattern_symmetry': (255, 0, 255)     # Magenta
         }
         self.stats_panel = StatisticsPanel()
+        self.graph_state = GraphState()
+        self.graph_interaction_region = (0, 0, 0, 0)  # x, y, width, height
+        self.stats = StatsTracker()
         
     def draw_trajectories(self, frame: np.ndarray, 
                          tracked_objects: Dict[int, TrackedObject]) -> np.ndarray:
@@ -594,7 +618,7 @@ class PatternVisualizer:
         return frame
 
     def draw_statistics_overlay(self, frame: np.ndarray, metrics: AdvancedMetrics) -> np.ndarray:
-        """Draw statistics visualization overlay."""
+        """Draw interactive statistics visualization overlay."""
         height, width = frame.shape[:2]
         
         # Update statistics
@@ -605,43 +629,62 @@ class PatternVisualizer:
         panel_height = height
         panel = np.zeros((panel_height, panel_width, 3), dtype=np.uint8)
         
+        # Update graph interaction region
+        self.graph_interaction_region = (
+            width - panel_width, 0, panel_width, panel_height
+        )
+        
         # Draw metrics graphs
         graph_height = panel_height // 6
-        for i, (metric, values) in enumerate(self.stats_panel.metrics_history.items()):
+        visible_metrics = [m for m, v in self.graph_state.visible_metrics.items() if v]
+        
+        for i, metric in enumerate(visible_metrics):
+            values = self.stats_panel.metrics_history[metric]
             if not values:
                 continue
-                
-            # Draw graph background
+            
+            # Calculate visible range
+            start_idx = max(0, len(values) - self.graph_state.time_window - self.graph_state.pan_offset)
+            end_idx = min(len(values), start_idx + self.graph_state.time_window)
+            visible_values = values[start_idx:end_idx]
+            
+            # Draw graph background and border
             y_offset = i * graph_height + 10
-            cv2.rectangle(panel, 
-                         (10, y_offset), 
+            cv2.rectangle(panel,
+                         (10, y_offset),
                          (panel_width-10, y_offset+graph_height-10),
                          (50, 50, 50), 1)
             
-            # Draw metric name
-            cv2.putText(panel, metric.replace('_', ' ').title(),
+            # Draw metric name with toggle indicator
+            color = self.stats_panel.graph_colors[metric]
+            toggle_char = "◉" if self.graph_state.visible_metrics[metric] else "○"
+            cv2.putText(panel, f"{toggle_char} {metric.replace('_', ' ').title()}",
                        (15, y_offset+15),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-                       self.stats_panel.graph_colors[metric], 1)
+                       color, 1)
             
-            # Draw graph
-            points = []
-            for j, value in enumerate(values):
-                x = 10 + int((panel_width-20) * j / len(values))
-                y = y_offset + graph_height - 20 - int((graph_height-30) * value)
-                points.append((x, y))
-            
-            if len(points) > 1:
-                cv2.polylines(panel, [np.array(points)], False,
-                            self.stats_panel.graph_colors[metric], 1)
+            # Draw graph line
+            if len(visible_values) > 1:
+                points = []
+                for j, value in enumerate(visible_values):
+                    x = 10 + int((panel_width-20) * j / len(visible_values))
+                    y = y_offset + graph_height - 20 - int((graph_height-30) * value)
+                    points.append((x, y))
+                cv2.polylines(panel, [np.array(points)], False, color, 1)
             
             # Draw current value
-            current_value = values[-1]
-            cv2.putText(panel, f"{current_value:.2f}",
-                       (panel_width-60, y_offset+15),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-                       self.stats_panel.graph_colors[metric], 1)
-        
+            if values:
+                cv2.putText(panel, f"{values[-1]:.2f}",
+                           (panel_width-60, y_offset+15),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                           color, 1)
+
+        # Draw zoom level indicator
+        cv2.putText(panel, f"Window: {self.graph_state.time_window}f",
+                   (10, panel_height-20),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                   (200, 200, 200), 1)
+
         # Blend panel with frame
         frame[:, -panel_width:] = cv2.addWeighted(
             frame[:, -panel_width:], 0.3,
@@ -651,16 +694,77 @@ class PatternVisualizer:
         
         return frame
 
-    def _draw_improvement_indicators(self, panel: np.ndarray, y_offset: int, 
-                                  current: float, previous: float, label: str):
-        """Draw improvement indicator arrows."""
-        if previous is None:
+    def handle_graph_interaction(self, event: int, x: int, y: int, flags: int) -> None:
+        """Handle mouse interactions for graph controls."""
+        # Check if mouse is in graph region
+        gx, gy, gw, gh = self.graph_interaction_region
+        if not (gx <= x <= gx + gw and gy <= y <= gy + gh):
+            self.graph_state.is_dragging = False
             return
+
+        if event == cv2.EVENT_LBUTTONDOWN:
+            # Check if click is on metric label for toggling
+            self._handle_metric_toggle(x, y)
+            self.graph_state.is_dragging = True
+            self.graph_state.last_mouse_pos = (x, y)
             
-        change = ((current - previous) / previous) * 100
-        color = (0, 255, 0) if change <= 0 else (0, 0, 255)  # Green if improved (lower is better)
-        
-        cv2.putText(panel, f"{label}: {abs(change):.1f}%",
-                   (10, y_offset),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-                   color, 1)
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.graph_state.is_dragging = False
+            
+        elif event == cv2.EVENT_MOUSEMOVE and self.graph_state.is_dragging:
+            # Pan the view
+            dx = x - self.graph_state.last_mouse_pos[0]
+            self.graph_state.pan_offset += dx
+            self.graph_state.pan_offset = max(0, min(
+                self.graph_state.pan_offset,
+                len(next(iter(self.metrics_history.values()))) - self.graph_state.time_window
+            ))
+            self.graph_state.last_mouse_pos = (x, y)
+            
+        elif event == cv2.EVENT_MOUSEWHEEL:
+            # Zoom in/out
+            if flags > 0:
+                self.graph_state.time_window = max(20, self.graph_state.time_window - 10)
+            else:
+                self.graph_state.time_window = min(200, self.graph_state.time_window + 10)
+
+    def _handle_metric_toggle(self, x: int, y: int) -> None:
+        """Toggle metric visibility when its label is clicked."""
+        panel_width = self.graph_interaction_region[2]
+        for i, metric in enumerate(self.graph_state.visible_metrics):
+            label_y = self.graph_interaction_region[1] + i * 20
+            if y >= label_y and y <= label_y + 15:
+                self.graph_state.visible_metrics[metric] = not self.graph_state.visible_metrics[metric]
+                break
+
+class GraphPanel:
+    def handle_mouse(self, event: int, x: int, y: int, flags: int) -> None:
+        try:
+            if not hasattr(self, 'state'):
+                return
+                
+            # Convert coordinates to local space
+            local_x = x
+            local_y = y
+            
+            if event == cv2.EVENT_MOUSEWHEEL:
+                zoom_factor = 1.1 if flags > 0 else 0.9
+                self.state.zoom_level = max(0.1, min(5.0, self.state.zoom_level * zoom_factor))
+                
+            elif event == cv2.EVENT_LBUTTONDOWN:
+                self.state.is_dragging = True
+                self.state.last_mouse_pos = (local_x, local_y)
+                
+            elif event == cv2.EVENT_LBUTTONUP:
+                self.state.is_dragging = False
+                
+            elif event == cv2.EVENT_MOUSEMOVE and self.state.is_dragging:
+                dx = local_x - self.state.last_mouse_pos[0]
+                self.state.pan_offset = max(0, min(
+                    self.state.pan_offset - dx,
+                    self._get_max_pan()
+                ))
+                self.state.last_mouse_pos = (local_x, local_y)
+                
+        except Exception as e:
+            print(f"Error in mouse handling: {e}")
