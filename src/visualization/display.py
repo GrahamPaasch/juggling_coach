@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Dict, Tuple, List, Optional
 from ..tracking.tracker import TrackedObject
 from ..analysis.pattern_recognition import PatternInfo
+from ..training.drill_generator import DrillExercise
+from ..analysis.metrics import AdvancedMetrics
 
 @dataclass
 class View3DState:
@@ -14,6 +16,14 @@ class View3DState:
     zoom: float = 1.0
     is_dragging: bool = False
     last_mouse_pos: Tuple[int, int] = (0, 0)
+
+@dataclass
+class DrillVisualization:
+    active_drill: DrillExercise = None
+    start_time: float = 0
+    progress: float = 0.0
+    success_count: int = 0
+    attempt_count: int = 0
 
 class PatternVisualizer:
     def __init__(self):
@@ -36,7 +46,33 @@ class PatternVisualizer:
         self.trajectory_3d_history = {}
         self.view_3d = View3DState()
         self.view_3d_region = (0, 0, 0, 0)  # x, y, width, height
-    
+        self.ideal_trajectory_cache = {}
+        self.error_threshold = 20  # pixels
+        self.drill_viz = DrillVisualization()
+        self.drill_colors = {
+            'progress_bar': (0, 255, 0),
+            'instruction': (255, 255, 255),
+            'success': (0, 255, 0),
+            'failure': (0, 0, 255),
+            'target': (255, 165, 0)
+        }
+        self.metrics_history: Dict[str, List[float]] = {
+            'height_consistency': [],
+            'horizontal_drift': [],
+            'beat_timing': [],
+            'dwell_ratio': [],
+            'pattern_symmetry': []
+        }
+        self.max_history = 100
+        self.graph_colors = {
+            'height_consistency': (255, 165, 0),  # Orange
+            'horizontal_drift': (0, 255, 0),      # Green
+            'beat_timing': (255, 0, 0),          # Red
+            'dwell_ratio': (0, 255, 255),        # Cyan
+            'pattern_symmetry': (255, 0, 255)     # Magenta
+        }
+        self.stats_panel = StatisticsPanel()
+        
     def draw_trajectories(self, frame: np.ndarray, 
                          tracked_objects: Dict[int, TrackedObject]) -> np.ndarray:
         """Draw ball trajectories with fade effect."""
@@ -348,3 +384,283 @@ class PatternVisualizer:
             alpha = i / len(trajectory)
             color = tuple([int(c * alpha) for c in self.colors['3d_trajectory']])
             cv2.line(view_region, pt1, pt2, color, 2)
+    
+    def draw_feedback(self, frame: np.ndarray, 
+                     current_metrics: AdvancedMetrics,
+                     tracked_objects: Dict[int, List[Tuple[int, int]]]) -> np.ndarray:
+        """Draw real-time feedback visualization."""
+        # Draw ideal trajectories
+        for obj_id, positions in tracked_objects.items():
+            if len(positions) > 2:
+                ideal_path = self._calculate_ideal_path(positions)
+                self._draw_path_envelope(frame, ideal_path, self.error_threshold)
+                
+                # Check if current position is outside envelope
+                current_pos = positions[-1]
+                if self._is_outside_envelope(current_pos, ideal_path):
+                    self._highlight_error(frame, current_pos)
+
+        # Add metric indicators
+        self._draw_metric_gauges(frame, current_metrics)
+        return frame
+
+    def update_drill(self, drill: DrillExercise, current_time: float):
+        """Update active drill information."""
+        if drill != self.drill_viz.active_drill:
+            self.drill_viz.active_drill = drill
+            self.drill_viz.start_time = current_time
+            self.drill_viz.progress = 0.0
+            self.drill_viz.success_count = 0
+            self.drill_viz.attempt_count = 0
+
+    def draw_drill_overlay(self, frame: np.ndarray, metrics: AdvancedMetrics) -> np.ndarray:
+        """Draw drill visualization and instructions."""
+        if not self.drill_viz.active_drill:
+            return frame
+
+        height = frame.shape[0]
+        width = frame.shape[1]
+
+        # Draw progress bar
+        progress_bar_width = int(width * 0.6)
+        progress_bar_height = 20
+        cv2.rectangle(frame, (int(width * 0.2), height - 30), 
+                     (int(width * 0.8), height - 10), (0, 0, 0), -1)
+        cv2.rectangle(frame, (int(width * 0.2), height - 30), 
+                     (int(width * 0.2 + progress_bar_width * self.drill_viz.progress), height - 10), 
+                     self.drill_colors['progress_bar'], -1)
+
+        # Draw instructions
+        instruction_text = f"Drill: {self.drill_viz.active_drill.name}"
+        cv2.putText(frame, instruction_text, (10, height - 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.drill_colors['instruction'], 2)
+
+        return frame
+
+    def _calculate_ideal_path(self, positions: List[Tuple[int, int]]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        """Calculate ideal path as a line from first to last position."""
+        if not positions:
+            return ((0, 0), (0, 0))
+        p1 = positions[0]
+        p2 = positions[-1]
+        return (p1, p2)
+
+    def _draw_path_envelope(self, frame: np.ndarray, 
+                          path: Tuple[Tuple[int, int], Tuple[int, int]], 
+                          error_threshold: float) -> None:
+        """Draw path envelope as parallel lines around ideal path."""
+        p1, p2 = path
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        angle = np.arctan2(dy, dx)
+        length = np.sqrt(dx**2 + dy**2)
+        
+        # Normal vector
+        nx = -dy / length
+        ny = dx / length
+        
+        # Offset by error threshold
+        p1_offset_high = (int(p1[0] + nx * error_threshold), int(p1[1] + ny * error_threshold))
+        p2_offset_high = (int(p2[0] + nx * error_threshold), int(p2[1] + ny * error_threshold))
+        p1_offset_low = (int(p1[0] - nx * error_threshold), int(p1[1] - ny * error_threshold))
+        p2_offset_low = (int(p2[0] - nx * error_threshold), int(p2[1] - ny * error_threshold))
+        
+        # Draw envelope lines
+        cv2.line(frame, p1_offset_high, p2_offset_high, (255, 0, 255), 2)
+        cv2.line(frame, p1_offset_low, p2_offset_low, (255, 0, 255), 2)
+
+    def _is_outside_envelope(self, point: Tuple[int, int], 
+                           path: Tuple[Tuple[int, int], Tuple[int, int]]) -> bool:
+        """Check if point is outside the path envelope."""
+        p1, p2 = path
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        length = np.sqrt(dx**2 + dy**2)
+        
+        if length == 0:
+            return False
+        
+        # Normal vector
+        nx = -dy / length
+        ny = dx / length
+        
+        # Distance from point to line
+        d = abs(nx * (point[0] - p1[0]) + ny * (point[1] - p1[1]))
+        
+        return d > self.error_threshold
+
+    def _highlight_error(self, frame: np.ndarray, point: Tuple[int, int]) -> None:
+        """Highlight error point in the frame."""
+        cv2.circle(frame, point, 8, (0, 0, 255), -1)
+
+    def _draw_metric_gauges(self, frame: np.ndarray, metrics: AdvancedMetrics) -> None:
+        """Draw gauges for advanced metrics."""
+        height, width = frame.shape[:2]
+        gauge_width = 100
+        gauge_height = 10
+        
+        # Draw each metric gauge
+        for i, (metric_name, value) in enumerate(metrics.__dict__.items()):
+            if metric_name in self.graph_colors:
+                # Position for the gauge
+                x = 10
+                y = height - 30 - i * (gauge_height + 10)
+                
+                # Draw gauge background
+                cv2.rectangle(frame, (x, y), (x + gauge_width, y + gauge_height), (50, 50, 50), -1)
+                
+                # Draw gauge fill
+                fill_width = int(gauge_width * value)
+                cv2.rectangle(frame, (x, y), (x + fill_width, y + gauge_height), 
+                             self.graph_colors[metric_name], -1)
+                
+                # Draw metric name
+                cv2.putText(frame, metric_name.replace('_', ' ').capitalize(), 
+                           (x + 5, y + gauge_height - 5), cv2.FONT_HERSHEY_SIMPLEX, 
+                           0.4, (255, 255, 255), 1)
+        
+        return frame
+
+    def add_heatmap(self, frame: np.ndarray, tracked_objects: Dict[int, TrackedObject]) -> np.ndarray:
+        """Add position heatmap to the frame."""
+        if self.heatmap is None:
+            self.heatmap = np.zeros(frame.shape[:2], dtype=np.float32)
+        
+        # Accumulate heatmap data
+        for obj in tracked_objects.values():
+            if obj.positions:
+                for pos in obj.positions:
+                    cv2.circle(self.heatmap, pos, 5, 1.0, -1)
+        
+        # Normalize and apply colormap
+        heatmap_normalized = cv2.normalize(self.heatmap, None, 0, 255, cv2.NORM_MINMAX)
+        heatmap_color = cv2.applyColorMap(heatmap_normalized.astype(np.uint8), cv2.COLORMAP_JET)
+        
+        # Blend with frame
+        frame = cv2.addWeighted(frame, 0.7, heatmap_color, 0.3, 0)
+        return frame
+
+    def reset_heatmap(self):
+        """Reset the position heatmap."""
+        self.heatmap = None
+
+    def update_statistics(self, metrics: AdvancedMetrics):
+        """Update statistics panel with new metrics."""
+        self.metrics_history['height_consistency'].append(metrics.throw_height_consistency)
+        self.metrics_history['horizontal_drift'].append(metrics.horizontal_drift)
+        self.metrics_history['beat_timing'].append(metrics.beat_timing_error)
+        self.metrics_history['dwell_ratio'].append(metrics.dwell_ratio)
+        self.metrics_history['pattern_symmetry'].append(metrics.pattern_symmetry)
+        
+        # Limit history size
+        for key in self.metrics_history.keys():
+            if len(self.metrics_history[key]) > self.max_history:
+                self.metrics_history[key].pop(0)
+
+    def draw_statistics_panel(self, frame: np.ndarray) -> np.ndarray:
+        """Draw the statistics panel on the frame."""
+        height, width = frame.shape[:2]
+        panel_height = 150
+        graph_width = 300
+        graph_height = 100
+        
+        # Draw panel background
+        cv2.rectangle(frame, (10, 10), (310, 10 + panel_height), (0, 0, 0), -1)
+        
+        # Draw each metric graph
+        for i, (metric_name, color) in enumerate(self.graph_colors.items()):
+            if metric_name in self.metrics_history:
+                # Prepare graph points
+                points = self.metrics_history[metric_name]
+                if len(points) > 1:
+                    # Normalize points for graph
+                    max_val = max(points)
+                    min_val = min(points)
+                    range_val = max_val - min_val if max_val - min_val > 0 else 1
+                    graph_points = [
+                        (int(10 + j * (graph_width - 20) / (len(points) - 1)), 
+                         int(10 + panel_height - (p - min_val) * graph_height / range_val))
+                        for j, p in enumerate(points)
+                    ]
+                    
+                    # Draw graph line
+                    cv2.polylines(frame, [np.array(graph_points)], False, color, 2)
+                
+                # Draw metric name
+                cv2.putText(frame, metric_name.replace('_', ' ').capitalize(), 
+                           (320, 30 + i * 25), cv2.FONT_HERSHEY_SIMPLEX, 
+                           0.5, color, 1)
+        
+        return frame
+
+    def draw_statistics_overlay(self, frame: np.ndarray, metrics: AdvancedMetrics) -> np.ndarray:
+        """Draw statistics visualization overlay."""
+        height, width = frame.shape[:2]
+        
+        # Update statistics
+        self.stats_panel.update(metrics)
+        
+        # Create stats panel region
+        panel_width = width // 4
+        panel_height = height
+        panel = np.zeros((panel_height, panel_width, 3), dtype=np.uint8)
+        
+        # Draw metrics graphs
+        graph_height = panel_height // 6
+        for i, (metric, values) in enumerate(self.stats_panel.metrics_history.items()):
+            if not values:
+                continue
+                
+            # Draw graph background
+            y_offset = i * graph_height + 10
+            cv2.rectangle(panel, 
+                         (10, y_offset), 
+                         (panel_width-10, y_offset+graph_height-10),
+                         (50, 50, 50), 1)
+            
+            # Draw metric name
+            cv2.putText(panel, metric.replace('_', ' ').title(),
+                       (15, y_offset+15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                       self.stats_panel.graph_colors[metric], 1)
+            
+            # Draw graph
+            points = []
+            for j, value in enumerate(values):
+                x = 10 + int((panel_width-20) * j / len(values))
+                y = y_offset + graph_height - 20 - int((graph_height-30) * value)
+                points.append((x, y))
+            
+            if len(points) > 1:
+                cv2.polylines(panel, [np.array(points)], False,
+                            self.stats_panel.graph_colors[metric], 1)
+            
+            # Draw current value
+            current_value = values[-1]
+            cv2.putText(panel, f"{current_value:.2f}",
+                       (panel_width-60, y_offset+15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                       self.stats_panel.graph_colors[metric], 1)
+        
+        # Blend panel with frame
+        frame[:, -panel_width:] = cv2.addWeighted(
+            frame[:, -panel_width:], 0.3,
+            panel, 0.7,
+            0
+        )
+        
+        return frame
+
+    def _draw_improvement_indicators(self, panel: np.ndarray, y_offset: int, 
+                                  current: float, previous: float, label: str):
+        """Draw improvement indicator arrows."""
+        if previous is None:
+            return
+            
+        change = ((current - previous) / previous) * 100
+        color = (0, 255, 0) if change <= 0 else (0, 0, 255)  # Green if improved (lower is better)
+        
+        cv2.putText(panel, f"{label}: {abs(change):.1f}%",
+                   (10, y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                   color, 1)
